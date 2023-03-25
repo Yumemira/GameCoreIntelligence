@@ -44,7 +44,7 @@ app.post('/crowscare-game-start', function(req,res){
     }
     else
     {
-        res.json({start:inst.starting, message:inst.log,num:inst.playerNum})
+        res.json({start:inst.starting, message:inst.globalLog,num:inst.playerNum})
     }
 })
 
@@ -59,7 +59,7 @@ app.post('/crowscare-game-suggestion', function(req,res){
     const searched = gameMeta.find(x => x.playerId === req.body.pid)
     const ans = tools.answerCompare(suggest,searched.generatedNum.join(''))
     const index = gameMeta.indexOf(searched)
-    gameMeta[index].globalLog.push({nums:suggest, ans:ans})
+    gameMeta[index].globalLog.push({author:'p',nums:suggest, ans:ans})
     const cans = tools.createAnswer(searched.playerNum, searched.weights, searched.stage, searched.found, searched.reserve, searched.log)
     
     gameMeta[index].reserve = cans.reserve
@@ -68,17 +68,25 @@ app.post('/crowscare-game-suggestion', function(req,res){
     gameMeta[index].found = cans.found
     gameMeta[index].log = cans.log
 
-
-    if(ans[0]===4)
+    if(cans.log[cans.log.length-1].ans[0]===4&&ans[0]===4)
     {
-        res.json({state:"win"})
+        gameMeta.splice(index, 1)
+        res.json({state:"Ничья", message:ans, act:cans.log[cans.log.length-1]})
     }
-    else if(cans.log.ans[0] === 4)
+    else if(ans[0]===4)
     {
-        res.json({state:"lose"})
+        gameMeta.splice(index, 1)
+        res.json({state:"Победа", message:ans, act:cans.log[cans.log.length-1]})
     }
-
-    res.json({message:ans, })
+    else if(cans.log[cans.log.length-1].ans[0]===4)
+    {
+        gameMeta.splice(index, 1)
+        res.json({state:"Поражение", message:ans, act:cans.log[cans.log.length-1]})
+    }
+    else
+    {
+        res.json({message:ans, act:cans.log[cans.log.length-1]})
+    }
 })
 
 app.post('/crowscare-end-game', function(req,res){

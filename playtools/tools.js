@@ -193,7 +193,7 @@ module.exports = {
                 coll.push(empty.nums[1])
                 answer = this.answerCompare(coll, comparison)
                 log.push({num:coll, ans:answer})
-                console.log(indexes)
+                
 
                 if(answer[0] + answer[1] === 2)
                 {
@@ -231,8 +231,6 @@ module.exports = {
                 coll.push(empty.nums[1])
                 answer = this.answerCompare(coll, comparison)
                 log.push({num:coll, ans:answer})
-                
-                console.log(indexes)
 
                 if(answer[0] + answer[1] === 2)
                 {
@@ -251,12 +249,7 @@ module.exports = {
             case 7:
                 if(reserve.find(x => x.weight === 0.5))
                 {
-                    console.log('true')
                     return this.createAnswer(comparison, weights, 5, found, reserve, log)
-                }
-                else
-                {
-                    console.log('false')
                 }
                 for(let i = 0; i < reserve.length; i++)
                 {
@@ -275,16 +268,11 @@ module.exports = {
                     let newIndex = weights.find(x => x.el.weight[i+1]===1)
                     if(newIndex)
                     {
-                        console.log(`элемент ${i} был пойман`)
-                        console.log(weights.indexOf(newIndex))
                         weights = this.swapElems(weights, [i, weights.indexOf(newIndex)])
                         weights[i].captured = true
                         found++
                     }
                 }
-                console.log(weights)
-                for(let i = 0; i < 4;i++) console.log(weights[i].el)
-
                 for(let i = 0; i < 4;i++)
                 {
                     
@@ -332,12 +320,7 @@ module.exports = {
 
                 while(indexes.length<2)
                 {
-                    if(!weights[a].captured&&weights[a].el.weight[indexes[0]+1]!==0,weights[indexes[0]].el.weight[a+1]!==0)
-                    {
-                        indexes.push(a)
-                    }
-                    a++
-                    if(a===5)
+                    if(a>3)
                     {
                         weights[indexes[0]].el.weight[indexes[0]+1] = 1
                         weights[indexes[0]].captured = true
@@ -345,48 +328,48 @@ module.exports = {
                         
                         return this.createAnswer(comparison, weights, stage, found, reserve, log)
                     }
+                    if(!weights[a].captured&&weights[a].el.weight[indexes[0]+1]!==0&&weights[indexes[0]].el.weight[a+1]!==0)
+                    {
+                        indexes.push(a)
+                    }
+                    a++
                 }
 
 
-                reserve = this.swapElems(weights, indexes)
+                weights = this.swapElems(weights, indexes)
 
                 for(let i = 0; i < 4; i++)
                 {
-                    coll.push(reserve[i].el.num)
+                    coll.push(weights[i].el.num)
                 }
 
                 answer = this.answerCompare(coll, comparison)
                 log.push({num:coll, ans:answer})
-
-                switch(answer[0]-found)
+                switch(answer[0]-log[log.length-2].ans[0])
                 {
-                    case 0:
-                        weights[indexes[0]].el.weight[indexes[1]+1] = 0
-                        weights[indexes[1]].el.weight[indexes[0]+1] = 0
-                        break
                     case 1:
-                        reserve = indexes
                         stage++
                         break
                     case 2:
-                        weights = reserve
                         weights[indexes[0]].el.weight[indexes[0]+1] = 1
                         weights[indexes[1]].el.weight[indexes[1]+1] = 1
                         weights[indexes[0]].captured = true
                         weights[indexes[1]].captured = true
                         found+=2
+                        break
+                    default:
+                        weights[indexes[0]].el.weight[indexes[0]+1] = 0
+                        weights[indexes[1]].el.weight[indexes[1]+1] = 0
+                        break
                 }
 
                 reserve = indexes
-                console.log(weights)
-                for(let i = 0;i < 4;i++) console.log(weights[i].el)
                 return {weights:weights,reserve:reserve,stage:stage,found:found,log:log}
             case 9:
                 for(let i = 0; i<4;i++)
                 {
                     coll.push(weights[i].el.num)
                 }
-                coll = this.swapElems(coll,reserve)
                 
                 for(let i = 0; i<10;i++)
                 {
@@ -398,7 +381,7 @@ module.exports = {
                 }
 
                 answer = this.answerCompare(coll, comparison)
-                weights = this.swapElems(weights, reserve)
+                log.push({num:coll, ans:answer})
 
                 if(answer[0]===found)
                 {
