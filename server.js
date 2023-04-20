@@ -23,9 +23,32 @@ var nicknames = []
 const server = http.createServer(app)
 const io = new Server(server, {
     cors: {
-      origin:process.env.FRONT_PATH,
+      origin:process.env.REACT_FRONT_PATH,
       methods: ['GET', 'POST']
     },
+})
+
+io.on("arena-normal",(socket) => {
+  console.log(`User connected ${socket.id}`)
+  socket.on("join-arena", (data) => {
+    const { userid } = data
+    const {state, init} = arenaTools.searchMethod(arenaMeta)
+    socket.join(init.roomid)
+    if(state)
+    {
+      arenaMeta[i].state = true
+
+      let i = arenaMeta.indexOf(init)
+      arenaMeta[i].sp = playerstats.find(x => x.id == userid)
+      arenaMeta[i].sphp = arenaMeta[i].sp.hp
+      io.to(init.roomid).emit("start", true)
+    }
+    else
+    {
+      arenaMeta.push(arenaTools.newInit(room, playerstats.find(x => x.id == userid)))
+    }
+    console.log(`User connected ${userid} to ${room} room`)
+  })
 })
 
 app.post('/crowscare-game-start', function(req,res){
@@ -49,11 +72,11 @@ app.post('/crowscare-game-start', function(req,res){
             stage:1
         }
         gameMeta.push(gameInstance)
-        res.json({start:gameInstance.starting, num:gameInstance.playerNum})
+        res.json({num:gameInstance.playerNum})
     }
     else
     {
-        res.json({start:inst.starting, message:inst.globalLog,num:inst.playerNum})
+        res.json({log:inst.log, plog:inst.plog, glog:inst.globalLog, num:inst.playerNum, php:inst.playerhp, shp:inst.crowhp})
     }
 })
 
@@ -70,36 +93,46 @@ app.post('/crowscare-game-suggestion', function(req,res){
     const index = gameMeta.indexOf(searched)
     const cans = tools.createAnswer(searched.playerNum, searched.weights, searched.stage, searched.found, searched.reserve, searched.log)
     
-    gameMeta[index].log.push(cans.log[cans.log.length-1])
+    gameMeta[index].log = cans.log
     gameMeta[index].plog.push({nums:suggest, ans:ans})
     gameMeta[index].globalLog.push({author:gameMeta[index].pname, dmg:ans[0]*gameMeta[index].pstr + ans[1]})
-    gameMeta[index].globalLog.push({author:'Пугало', dmg:cans.ans[0]*3 + cans.ans[1]})
+    gameMeta[index].globalLog.push({author:'Пугало', dmg:cans.log[cans.log.length-1].ans[0]*3 + cans.log[cans.log.length-1].ans[1]})
 
     gameMeta[index].crowhp -= ans[0]*3 + ans[1]
-    gameMeta[index].playerhp -= cans.ans[0]*3 + cans.ans[1]
+    gameMeta[index].playerhp -= cans.log[cans.log.length-1].ans[0]*3 + cans.log[cans.log.length-1].ans[1]
     gameMeta[index].reserve = cans.reserve
     gameMeta[index].weights = cans.weights
     gameMeta[index].stage = cans.stage
     gameMeta[index].found = cans.found
 
+    if(cans.log[cans.log.length-1].ans[0] == 4)
+    {
+      gameMeta[index].playerhp = 0
+    }
+    if(ans[0]==4)
+    {
+      gameMeta[index].crowhp = 0
+    }
+
     if(gameMeta[index].crowhp <= 0 && gameMeta[index].playerhp <= 0)
     {
-        gameMeta.splice(index, 1)
-        res.json({state:"Ничья", glogs:[gameMeta[index].globalLog[gameMeta[index].globalLog.length - 2],gameMeta[index].globalLog[gameMeta[index].globalLog.length - 1]], plog:gameMeta[index].plog[gameMeta[index].plog.length - 1], log:gameMeta[index].log[gameMeta[index].log.length - 1]})
+        const tmp = gameMeta.splice(index, 1)[0]
+        res.json({state:"Ничья", glogs:[tmp.globalLog[tmp.globalLog.length - 2],tmp.globalLog[tmp.globalLog.length - 1]], plog:tmp.plog[tmp.plog.length - 1], log:tmp.log[tmp.log.length - 1]})
     }
     else if(gameMeta[index].crowhp <= 0)
     {
-        gameMeta.splice(index, 1)
-        res.json({state:"Победа",glogs:[gameMeta[index].globalLog[gameMeta[index].globalLog.length - 2],gameMeta[index].globalLog[gameMeta[index].globalLog.length - 1]], plog:gameMeta[index].plog[gameMeta[index].plog.length - 1], log:gameMeta[index].log[gameMeta[index].log.length - 1]})
+        const tmp = gameMeta.splice(index, 1)[0]
+        res.json({state:"Победа", glogs:[tmp.globalLog[tmp.globalLog.length - 2],tmp.globalLog[tmp.globalLog.length - 1]], plog:tmp.plog[tmp.plog.length - 1], log:tmp.log[tmp.log.length - 1]})
     }
     else if(gameMeta[index].playerhp <= 0)
     {
-        gameMeta.splice(index, 1)
-        res.json({state:"Поражение", glogs:[gameMeta[index].globalLog[gameMeta[index].globalLog.length - 2],gameMeta[index].globalLog[gameMeta[index].globalLog.length - 1]], plog:gameMeta[index].plog[gameMeta[index].plog.length - 1], log:gameMeta[index].log[gameMeta[index].log.length - 1]})
+        const tmp = gameMeta.splice(index, 1)[0]
+
+        res.json({state:"Поражение", glogs:[tmp.globalLog[tmp.globalLog.length - 2],tmp.globalLog[tmp.globalLog.length - 1]], plog:tmp.plog[tmp.plog.length - 1], log:tmp.log[tmp.log.length - 1]})
     }
     else
     {
-        res.json({glogs:[gameMeta[index].globalLog[gameMeta[index].globalLog.length - 2],gameMeta[index].globalLog[gameMeta[index].globalLog.length - 1]], plog:gameMeta[index].plog[gameMeta[index].plog.length - 1], log:gameMeta[index].log[gameMeta[index].log.length - 1]})
+        res.json({glogs:[gameMeta[index].globalLog[gameMeta[index].globalLog.length - 2],gameMeta[index].globalLog[gameMeta[index].globalLog.length - 1]], plog:gameMeta[index].plog[gameMeta[index].plog.length - 1], log:gameMeta[index].log[gameMeta[index].log.length - 1], php:gameMeta[index].playerhp, shp:gameMeta[index].crowhp})
     }
 })
 
@@ -153,7 +186,9 @@ app.post("/register",function(req, res){
           serverTools.queryToDbMain(`select id from userstable where email = $1 limit 1`,[umail])
           .then(uret => {
             serverTools.queryToDb(`insert into "hpBackups" (id, maxhp, maxep, vitality, strength, agility, intelligency) values ($1,50, 50, 1, 1, 1, 1)`,[uret[0].id])
-            res.json({message: "Успешная регистрация", lkey: unicKey, success: true, uid: uret[0].id});
+            playerstats.push({id:uret[0].id, hp:50, ep:50, maxhp:50, maxep:50, vitality:1, strength:1, agility:1, intelligency:1})
+            nicknames.push({id:uret[0].id, name:uname})
+            res.json({message: "Успешная регистрация", lkey: unicKey, success: true, uid: uret[0].id})
           });
         })
       }
@@ -180,11 +215,7 @@ app.post("/login",function(req, res){
         .then(rety => {
           if(rety.length===0)
           {
-            let tommorow = serverTools.addDays(1)
-            serverTools.queryToDb(`insert into "Player" (id, premium) values($1, $2)`,[ret[0].id, tommorow])
-            serverTools.queryToDb(`insert into scores (id,name, kill, score, pwpwin, pwplose) values ($1,$2,0,0,0,0)`,[ret[0].id,ret[0].name])
             serverTools.queryToDb(`insert into "hpBackups" (id, maxhp, maxep, vitality, strength, agility, intelligency) values ($1,50, 50, 1, 1, 1, 1)`,[ret[0].id])
-            scorestats.push({id:ret[0].id, name:ret[0].name, kill:0, score:0, pwpwin:0, pwplose:0})
             playerstats.push({id:ret[0].id, hp:50, ep:50, maxhp:50, maxep:50, vitality:1, strength:1, agility:1, intelligency:1})
             nicknames.push({id:ret[0].id, name:ret[0].name})
           }
@@ -195,7 +226,7 @@ app.post("/login",function(req, res){
   });
 
 app.post('/p-stat', function(req,res){
-  res.json({nickname:nicknames.find(x => x.id === req.body.id)[1], hp:playerstats.find(x => x.id === req.body.id)[1], ep:playerstats.find(x => x.id === req.body.id)[2]})
+  res.json({nickname:nicknames.find(x => x.id === req.body.id).name, hp:playerstats.find(x => x.id === req.body.id).hp, ep:playerstats.find(x => x.id === req.body.id).ep})
 });
 
 
@@ -218,7 +249,6 @@ server.listen(port, hostname, () => {
       }
     })
 
-    console.log('starting')
     setInterval(() => {
         for(let heali = 0; heali < playerstats.length; heali++)
         {

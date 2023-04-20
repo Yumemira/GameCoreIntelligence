@@ -98,7 +98,7 @@ module.exports = {
                     stage = 2
                 }
 
-                return {weights:weights,reserve:reserve,stage:stage,found:found, log:log}
+                return {weights:weights, reserve:reserve, stage:stage, found:found, log:log}
             case 2:
                 for(let i = 4;i < 8; i++)
                 {
@@ -106,9 +106,9 @@ module.exports = {
                 }
 
                 answer = this.answerCompare(coll, comparison)
+                log.push({num:coll, ans:answer})
                 if(answer[0]+answer[1]===4)
                 {
-                    reserve = []
                     reserve.push({nums:[coll[0],coll[1]],weight:1})
                     reserve.push({nums:[coll[2],coll[3]],weight:1})
                     stage = 7
@@ -116,9 +116,8 @@ module.exports = {
                 else
                 {
                     found += answer[0] + answer[1]
-                    log.push({num:coll, ans:answer})
                     unfound = (4-found)/2
-                    reserve.push({nums:[weights[8].num,weights[9].num], weight:unfound})
+                    reserve.push({nums:[weights[8].num, weights[9].num], weight:unfound})
                     weights[8].weight[0] = unfound
                     weights[9].weight[0] = unfound
 
@@ -163,7 +162,13 @@ module.exports = {
                     answer = this.answerCompare(coll, comparison)
                     log.push({num:coll, ans:answer})
                     reserve.push({nums:[weights[4].num, weights[5].num], weight:(answer[0]+answer[1])/2-reserve[0].weight})
-                    reserve.push({nums:[weights[6].num, weights[7].num], weight:((log[1].ans[0]+log[1].ans[1])/2-(answer[0]+answer[1])/2+reserve[0].weight)})
+                    
+                    unfound = 2
+                    for(let i = 0; i<reserve.length;i++)
+                    {
+                        unfound -= reserve[i].weight
+                    }
+                    reserve.push({nums:[weights[6].num, weights[7].num], weight:unfound})
                 }
                 else
                 {
@@ -273,22 +278,6 @@ module.exports = {
                         found++
                     }
                 }
-                for(let i = 0; i < 4;i++)
-                {
-                    
-                    if(weights[i].el.weight[i+1]===0)
-                    {
-                        for(let a = 0;a<4;a++)
-                        {
-                            if(weights[a].el.weight[a+1]!==1&&weights[a].el.weight[i+1]!==0&&weights[i].el.weight[a+1]!==0)
-                            {
-                                console.log(`элемент ${i} был заменён на ${a}`)
-                                weights = this.swapElems(weights, [i, a])
-                                a = 4
-                            }
-                        }
-                    }
-                }
 
                 for(let i = 0; i< 4;i++)
                 {
@@ -305,6 +294,7 @@ module.exports = {
                         if(!weights[i].captured) weights[i].el.weight[i+1] = 0
                     }
                 }
+                found = answer[0]
 
                 return {weights:weights,reserve:reserve,stage:stage+1,found:found,log:log}
             case 8:
@@ -337,7 +327,7 @@ module.exports = {
 
 
                 weights = this.swapElems(weights, indexes)
-
+                
                 for(let i = 0; i < 4; i++)
                 {
                     coll.push(weights[i].el.num)
@@ -345,7 +335,7 @@ module.exports = {
 
                 answer = this.answerCompare(coll, comparison)
                 log.push({num:coll, ans:answer})
-                switch(answer[0]-log[log.length-2].ans[0])
+                switch(answer[0]-found)
                 {
                     case 1:
                         stage++
@@ -356,6 +346,17 @@ module.exports = {
                         weights[indexes[0]].captured = true
                         weights[indexes[1]].captured = true
                         found+=2
+                        break
+                    case -1:
+                        stage = 10
+                        break
+                    case -2:
+                        weights = this.swapElems(weights, indexes)
+                        weights[indexes[0]].el.weight[indexes[0]+1] = 1
+                        weights[indexes[1]].el.weight[indexes[1]+1] = 1
+                        weights[indexes[0]].captured = true
+                        weights[indexes[1]].captured = true
+                        found +=2
                         break
                     default:
                         weights[indexes[0]].el.weight[indexes[0]+1] = 0
@@ -383,19 +384,54 @@ module.exports = {
                 answer = this.answerCompare(coll, comparison)
                 log.push({num:coll, ans:answer})
 
-                if(answer[0]===found)
+                if(answer[0]===log[log.length-2].ans[0])
                 {
-                    weights[reserve[0]].el.weight[reserve[0]+1] = 0
+                    weights[reserve[0]].el.weight[reserve[0]+1] = 1
+                    weights[reserve[1]].el.weight[reserve[1]+1] = 0
+                    weights[reserve[0]].captured = true
+                }
+                else
+                {
+                    weights[reserve[0]].el.weight[reserve[1]+1] = 0
+                    weights[reserve[1]].el.weight[reserve[0]+1] = 1
+                    weights[reserve[1]].captured = true
+                }
+                found++
+                stage--
+                return {weights:weights,reserve:reserve,stage:stage,found:found,log:log}
+        
+            case 10:
+                this.swapElems(weights, reserve)
+                for(let i = 0; i<4;i++)
+                {
+                    coll.push(weights[i].el.num)
+                }
+                
+                for(let i = 0; i<10;i++)
+                {
+                    if(!weights.find(x => x.el.num === i))
+                    {
+                        coll[reserve[1]] = i
+                        break
+                    }
+                }
+
+                answer = this.answerCompare(coll, comparison)
+                log.push({num:coll, ans:answer})
+
+                if(answer[0]===log[log.length-2].ans[0])
+                {
+                    weights[reserve[0]].el.weight[reserve[1]+1] = 0
                     weights[reserve[1]].el.weight[reserve[1]+1] = 1
                     weights[reserve[1]].captured = true
                 }
                 else
                 {
-                    weights[reserve[1]].el.weight[reserve[1]+1] = 0
                     weights[reserve[0]].el.weight[reserve[0]+1] = 1
+                    weights[reserve[1]].el.weight[reserve[1]+1] = 0
                     weights[reserve[0]].captured = true
                 }
-                stage--
+                stage=8
                 return {weights:weights,reserve:reserve,stage:stage,found:found,log:log}
         }
         console.log('out of bounds!!')
