@@ -1,12 +1,15 @@
 module.exports = {
-    searchMethod:function(arenaMeta){
-        arenaMeta.map((data) => {
-            if(!data.state)
+    searchMethod:function(arenaMeta, id){
+        for(let i = 0; i< arenaMeta.length; i++)
+        {
+            if(!arenaMeta[i].state&&arenaMeta[i].fp.id != id)
             {
+                console.log("found")
                 return {state:true, init:data}
             }
-        })
-        return {state:false, room:this.generateRoom(arenaMeta)}
+        }
+
+        return {state:false, init:null}
     },
 
     generateRoom:function(arenaMeta){

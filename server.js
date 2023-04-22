@@ -28,30 +28,31 @@ const io = new Server(server, {
     },
 })
 
-io.on("arena-normal",(socket) => {
+io.on("connection",(socket) => {
   console.log(`User connected ${socket.id}`)
-  socket.on("join-arena", (data) => {
-    const { userid } = data
-    const {state, init} = arenaTools.searchMethod(arenaMeta)
-    socket.join(init.roomid)
-    if(state)
-    {
-      arenaMeta[i].state = true
+  socket.on("start_game", (data) => {
+    const {user, room} = data
+    socket.join(room)
+    console.log(`game has been started by ${user}`)
+    io.to(room).emit("start", true)
+  })
 
-      let i = arenaMeta.indexOf(init)
-      arenaMeta[i].sp = playerstats.find(x => x.id == userid)
-      arenaMeta[i].sphp = arenaMeta[i].sp.hp
-      io.to(init.roomid).emit("start", true)
-    }
-    else
-    {
-      arenaMeta.push(arenaTools.newInit(room, playerstats.find(x => x.id == userid)))
-    }
-    console.log(`User connected ${userid} to ${room} room`)
+  socket.on("search_game", (data) => {
+    const {user, room} = data
+    console.log(`user ${user} starts searching`)
+    socket.join(room)
+
+  })
+  
+  socket.on("leave_searching", (data) => {
+    const { room} = data
+    arenaMeta.splice(arenaMeta.find(x => x.roomid == room), 1)
+    console.log(`room ${room} has been deleted`)
   })
 })
 
-app.post('/crowscare-game-start', function(req,res){
+
+app.post('/crowscare-game-start', function(req, res){
     const inst = gameMeta.find(x => x.playerId === req.body.pid)
     if(!inst){
         const gameInstance = {
@@ -79,13 +80,11 @@ app.post('/crowscare-game-start', function(req,res){
         res.json({log:inst.log, plog:inst.plog, glog:inst.globalLog, num:inst.playerNum, php:inst.playerhp, shp:inst.crowhp})
     }
 })
-
 app.post('/crowscare-set-number',function(req,res){
     let elem = gameMeta.find(x => x.playerId === req.body.pid)
     gameMeta[gameMeta.indexOf(elem)].playerNum = req.body.setting
     res.json({message:'success'})
 })
-
 app.post('/crowscare-game-suggestion', function(req,res){
     const suggest = req.body.suggest
     const searched = gameMeta.find(x => x.playerId === req.body.pid)
@@ -113,7 +112,6 @@ app.post('/crowscare-game-suggestion', function(req,res){
     {
       gameMeta[index].crowhp = 0
     }
-
     if(gameMeta[index].crowhp <= 0 && gameMeta[index].playerhp <= 0)
     {
         const tmp = gameMeta.splice(index, 1)[0]
@@ -135,37 +133,46 @@ app.post('/crowscare-game-suggestion', function(req,res){
         res.json({glogs:[gameMeta[index].globalLog[gameMeta[index].globalLog.length - 2],gameMeta[index].globalLog[gameMeta[index].globalLog.length - 1]], plog:gameMeta[index].plog[gameMeta[index].plog.length - 1], log:gameMeta[index].log[gameMeta[index].log.length - 1], php:gameMeta[index].playerhp, shp:gameMeta[index].crowhp})
     }
 })
-
 app.post('/crowscare-end-game', function(req,res){
     gameMeta.splice(gameMeta.indexOf(gameMeta.find(x => x.playerId === req.body.pid)), 1)
     res.json({message:'success'})
 })
 
 
-app.post('/arena-fight--game-start', function(req,res){
-    const metaframe = arenaMeta.find(x => x.player[0] === req.body.pid)||arenaMeta.find(x => x.player[1] === req.body.pid)
-    if(metaframe)
+
+app.post('/pvp-game-preparation', function(req, res){
+  const { userid } = req.body
+  const {state, init} = arenaTools.searchMethod(arenaMeta, userid)
+  console.log({state, init})
+  let i = null
+  if(state)
+  {
+    i = arenaMeta.indexOf(init)
+    arenaMeta[i].state = true
+
+    arenaMeta[i].sp = playerstats.find(x => x.id === userid)
+    arenaMeta[i].sphp = arenaMeta[i].sp.hp
+
+    res.json({state:state, room:arenaMeta[i].roomid})
+  }
+  else
+  {
+    let a = arenaMeta.find(x => x.fp.id == userid)
+    if(!a)
     {
-        res.json({room:metaframe.room, state:playing})
+      i = arenaMeta.indexOf(a)
+
+      if(i == -1) i = arenaMeta.push(arenaTools.newInit(arenaTools.generateRoom(arenaMeta), playerstats.find(x => x.id == userid))) - 1
+      res.json({state:state, room:arenaMeta[i].roomid})
     }
     else
     {
-        metaframe = arenaMeta.find(x => x.state === 'searching')
-        if(metaframe)
-        {
-            arenaMeta[arenaMeta.indexOf(metaframe)].state = 'starting'
-        
-            res.json({room:metaframe.room, state:'starting'})
-        }
-        else
-        {
-            metaframe = {
-                
-            }
-            arenaMeta.push(metaframe)
-        }
+
+      res.json({state:false, room:a.roomid})
     }
+  }
 })
+
 
 
 app.post("/register",function(req, res){
