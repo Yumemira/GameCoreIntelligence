@@ -29,25 +29,114 @@ const io = new Server(server, {
 })
 
 io.on("connection",(socket) => {
-  console.log(`User connected ${socket.id}`)
   socket.on("start_game", (data) => {
     const {user, room} = data
     socket.join(room)
+    
+    i = arenaMeta.indexOf(arenaMeta.find(x => x.roomid == room))
+    arenaMeta[i].state = true
+    arenaMeta[i].sp = playerstats.find(x => x.id === user)
+    arenaMeta[i].sname = nicknames.find(x => x.id == user).name
+    arenaMeta[i].sphp = arenaMeta[i].sp.hp
+
     console.log(`game has been started by ${user}`)
-    io.to(room).emit("start", true)
+    io.to(room).emit("start")
   })
 
   socket.on("search_game", (data) => {
     const {user, room} = data
     console.log(`user ${user} starts searching`)
     socket.join(room)
+    console.log(arenaMeta)
+  })
 
+  socket.on("end-game", (data) => {
+    const {room} = data
+
+    arenaMeta.splice(arenaMeta.indexOf(arenaMeta.find(x => x.roomid == room)), 1)
+    socket.leave(room)
   })
   
   socket.on("leave_searching", (data) => {
-    const { room} = data
-    arenaMeta.splice(arenaMeta.find(x => x.roomid == room), 1)
+    const {room} = data
+    arenaMeta.splice(arenaMeta.indexOf(arenaMeta.find(x => x.roomid == room)), 1)
+    socket.leave(room)
+    io.to(room).emit("cancel--game")
     console.log(`room ${room} has been deleted`)
+  })
+
+  socket.on("prepared", data => {
+    const {room} = data
+    io.to(room).emit("opponent-ready")
+  })
+
+  socket.on("number_attached", data => {
+    const {nums, user, room} = data
+    const i = arenaMeta.findIndex(x => x.roomid == room)
+
+    if(arenaMeta[i].fp.id == user)
+    {
+      arenaMeta[i].fnums = nums
+      io.to(room).emit("message", {name:arenaMeta[i].fname, text:"Подтверждаю готовность в дуэли"})
+    }
+    else
+    {
+      arenaMeta[i].snums = nums
+      
+      io.to(room).emit("message", {name:arenaMeta[i].sname, text:"Подтверждаю готовность в дуэли"})
+    }
+    if(arenaMeta[i].fnums&&arenaMeta[i].snums)
+    {
+      if(Math.floor(Math.random()*2)<1)
+      {
+        arenaMeta[i].turn = arenaMeta[i].fp.id
+      }
+      else
+      {
+        arenaMeta[i].turn = arenaMeta[i].sp.id
+      }
+    }
+  })
+
+  socket.on("number_suggest", data => {
+    const {place, user, room, suggest} = data
+    let i = arenaMeta.findIndex(x => x.roomid == room)
+    let won = false
+    if(arenaMeta[i].turn == user)
+    {
+      if(place == 0)
+      {
+        const ans = tools.answerCompare(suggest, arenaMeta[i].snums)
+        arenaMeta[i].glog.push({author:arenaMeta[i].fname, dmg:ans[0]*3 + ans[1]})
+        arenaMeta[i].flog.push({nums:suggest,ans:ans})
+        arenaMeta[i].sphp -= ans[0]*3 + ans[1]
+        arenaMeta[i].turn = arenaMeta[i].sp.id
+
+        if(arenaMeta[i].sphp <= 0||ans[0]==4)
+        {
+          won = true
+        }
+
+        io.to(room).emit("suggested", {user:user, glog:arenaMeta[i].glog[arenaMeta[i].glog.length-1], log:arenaMeta[i].flog[arenaMeta[i].flog.length-1], hp:arenaMeta[i].sphp, won:won})
+      }
+      else
+      {
+        const ans = tools.answerCompare(suggest, arenaMeta[i].fnums)
+        arenaMeta[i].glog.push({author:arenaMeta[i].sname, dmg:ans[0]*3 + ans[1]})
+        arenaMeta[i].slog.push({nums:suggest,ans:ans})
+        arenaMeta[i].fphp -= ans[0]*3 + ans[1]
+        arenaMeta[i].turn = arenaMeta[i].fp.id
+
+        if(arenaMeta[i].fphp <= 0||ans[0]==4)
+        {
+          won = true
+        }
+
+
+        io.to(room).emit("suggested", {user:user, glog:arenaMeta[i].glog[arenaMeta[i].glog.length-1], log:arenaMeta[i].slog[arenaMeta[i].slog.length-1], hp:arenaMeta[i].fphp, won:won})
+      }
+    }
+    
   })
 })
 
@@ -143,16 +232,11 @@ app.post('/crowscare-end-game', function(req,res){
 app.post('/pvp-game-preparation', function(req, res){
   const { userid } = req.body
   const {state, init} = arenaTools.searchMethod(arenaMeta, userid)
-  console.log({state, init})
+  console.log(init)
   let i = null
   if(state)
   {
     i = arenaMeta.indexOf(init)
-    arenaMeta[i].state = true
-
-    arenaMeta[i].sp = playerstats.find(x => x.id === userid)
-    arenaMeta[i].sphp = arenaMeta[i].sp.hp
-
     res.json({state:state, room:arenaMeta[i].roomid})
   }
   else
@@ -162,8 +246,8 @@ app.post('/pvp-game-preparation', function(req, res){
     {
       i = arenaMeta.indexOf(a)
 
-      if(i == -1) i = arenaMeta.push(arenaTools.newInit(arenaTools.generateRoom(arenaMeta), playerstats.find(x => x.id == userid))) - 1
-      res.json({state:state, room:arenaMeta[i].roomid})
+      if(i == -1) i = arenaMeta.push(arenaTools.newInit(arenaTools.generateRoom(arenaMeta), playerstats.find(x => x.id == userid), nicknames)) - 1
+      res.json({state:false, room:arenaMeta[i].roomid})
     }
     else
     {
@@ -172,6 +256,24 @@ app.post('/pvp-game-preparation', function(req, res){
     }
   }
 })
+
+app.post("/pvp-game-loadstats", function(req, res){
+  const {id, room} = req.body
+  const init = arenaMeta.find(x => x.roomid == room)
+  let uid = 0
+  if(init.fp.id != id)
+  {
+    uid = 1
+  
+    res.json({hp:init.sphp, place:uid, shp:init.fphp, name:init.fname})
+  }
+  else
+  {
+    res.json({hp:init.fphp, place:uid, shp:init.sphp, name:init.sname})
+  }
+})
+
+
 
 
 

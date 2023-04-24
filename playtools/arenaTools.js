@@ -4,8 +4,7 @@ module.exports = {
         {
             if(!arenaMeta[i].state&&arenaMeta[i].fp.id != id)
             {
-                console.log("found")
-                return {state:true, init:data}
+                return {state:true, init:arenaMeta[i]}
             }
         }
 
@@ -20,14 +19,19 @@ module.exports = {
         }
         return r
     },
-    newInit:function(room, player){
+    newInit:function(room, player, names){
         let ret = {
             state:false,
+            turn:null,
             roomid:room,
             fp:player,
+            fname:names.find(x => x.id == player.id).name,
             fphp:player.hp,
+            fnums:null,
             sp:null,
             sphp:null,
+            sname:null,
+            snums:null,
             glog:[],
             flog:[],
             slog:[]
